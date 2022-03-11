@@ -4,7 +4,7 @@
 # @Author: laoweimin@corp.netease.com
 # @Time: 2022/3/11 10:23
 from PyQt5.QtWidgets import QPushButton, QLabel, QWidget, QHBoxLayout, QVBoxLayout
-from PyQt5.Qt import QApplication, QPixmap, QImage, QSize, QTimer
+from PyQt5.Qt import QApplication, QPixmap, QImage, QSize, QTimer, pyqtSignal
 
 
 class TestPoint(object):
@@ -17,8 +17,13 @@ class TestPoint(object):
 		self.button.setParent(parent.window)
 		self.button.clicked.connect(self.onClick)
 		self.button.resize(self.SIZE)
+		self.x, self.y = x, y
 		self.button.move(x, y)
 		self.key = key
+
+	def resize(self, xratio, yratio):
+		self.button.move(self.x * xratio, self.y * yratio)
+		self.button.resize(self.SIZE.width()* xratio, self.SIZE.height()* yratio)
 
 	def onClick(self):
 		self.parent.currenttime = 60
@@ -39,6 +44,18 @@ testpoints = [
 	}
 ]
 
+class MyWindow(QWidget):
+	onresize = pyqtSignal()
+	def __init__(self):
+		super(MyWindow, self).__init__()
+
+	def resizeEvent(self, event):
+
+		ret = super(MyWindow, self).resizeEvent(event)
+		self.onresize.emit()
+		return ret
+
+
 class TestJob(object):
 	def __init__(self):
 		super(TestJob, self).__init__()
@@ -49,7 +66,7 @@ class TestJob(object):
 		self.currenttime = 0
 
 	def initUI(self):
-		self.window = QWidget()
+		self.window = MyWindow()
 		self.window.setWindowTitle("测试工具")
 		self.label = QLabel()
 
@@ -58,6 +75,9 @@ class TestJob(object):
 		layout.addWidget(self.label)
 		image = QImage()
 		image.load("map.jpg")
+		imgsize = image.size()
+		self.imgw, self.imgh = imgsize.width(), imgsize.height()
+		self.label.setScaledContents(True)
 		self.label.setPixmap(QPixmap.fromImage(image))
 
 		hlayout = QHBoxLayout()
@@ -71,8 +91,16 @@ class TestJob(object):
 		hlayout.addWidget(self.stop)
 		layout.addLayout(hlayout)
 		self.initTestPoints()
-
+		self.window.onresize.connect(self.onResize)
 		self.window.show()
+
+	def onResize(self):
+		nowsize = self.label.size()
+		noww, nowh = nowsize.width(), nowsize.height()
+		xratio = noww / self.imgw
+		yratio = nowh / self.imgh
+		for tp in self.testpoints:
+			tp.resize(xratio, yratio)
 
 	def onTimeout(self):
 		if self.currenttime > 0:
